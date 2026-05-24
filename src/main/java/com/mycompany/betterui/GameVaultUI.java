@@ -8,27 +8,25 @@ package com.mycompany.betterui;
  *
  * @author gmlol
  */
-import com.formdev.flatlaf.themes.FlatMacDarkLaf;
+import com.formdev.flatlaf.FlatDarkLaf;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.stream.Collectors;
-import static javax.swing.WindowConstants.EXIT_ON_CLOSE;
 
 public class GameVaultUI extends JFrame {
 
     private VaultManager manager;
-
-    private JTable table;
-    private DefaultTableModel tableModel;
 
     private JTextField txtTitle, txtGenre, txtExtra, txtSearch;
 
@@ -40,14 +38,15 @@ public class GameVaultUI extends JFrame {
 
     private JLabel lblImageName;
 
+    private JPanel gameGrid;
+
+    private final String COVER_FOLDER = "covers";
+
     private String currentImagePath = "none";
 
-    // MODERN COLORS
     private final Color BACKGROUND = new Color(24, 26, 32);
     private final Color PANEL = new Color(36, 38, 46);
-    private final Color ACCENT = new Color(88, 101, 242);
     private final Color TEXT = new Color(230, 230, 230);
-    private final Color TABLE_BG = new Color(30, 32, 40);
 
     private final Font UI_FONT = new Font("Segoe UI", Font.PLAIN, 14);
 
@@ -61,32 +60,36 @@ public class GameVaultUI extends JFrame {
 
     private void setupUI() {
 
-        UIManager.put("Component.arc", 15);
-        UIManager.put("TextComponent.arc", 15);
-        UIManager.put("Button.arc", 20);
-
         setTitle("GameVault");
-        setSize(1280, 760);
+        setSize(1400, 800);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
         getContentPane().setBackground(BACKGROUND);
+
+        UIManager.put("Component.arc", 15);
+        UIManager.put("TextComponent.arc", 15);
+        UIManager.put("Button.arc", 20);
     }
 
     private void setupLayout() {
 
         setLayout(new BorderLayout());
 
-        // =========================
-        // SEARCH BAR
-        // =========================
+        // ========================================
+        // TOP SEARCH BAR
+        // ========================================
 
         JPanel topPanel = new JPanel(new BorderLayout());
+
         topPanel.setBackground(BACKGROUND);
+
         topPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
 
         txtSearch = new JTextField();
-        txtSearch.setPreferredSize(new Dimension(300, 42));
+
+        txtSearch.setPreferredSize(new Dimension(300, 40));
+
         txtSearch.setFont(UI_FONT);
 
         txtSearch.putClientProperty(
@@ -101,145 +104,82 @@ public class GameVaultUI extends JFrame {
         txtSearch.getDocument().addDocumentListener(new DocumentListener() {
 
             public void insertUpdate(DocumentEvent e) {
-                filterTable();
+                filterGames();
             }
 
             public void removeUpdate(DocumentEvent e) {
-                filterTable();
+                filterGames();
             }
 
             public void changedUpdate(DocumentEvent e) {
-                filterTable();
+                filterGames();
             }
         });
 
-        // =========================
-        // TABLE
-        // =========================
+        // ========================================
+        // GAME GRID
+        // ========================================
 
-        String[] columns = {
-                "Cover",
-                "Title",
-                "Genre",
-                "Detail",
-                "Status",
-                "Story Progress"
-        };
+        setupGameGrid();
 
-        tableModel = new DefaultTableModel(columns, 0) {
-
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-
-            @Override
-            public Class<?> getColumnClass(int column) {
-                return column == 0 ? Icon.class : String.class;
-            }
-        };
-
-        table = new JTable(tableModel);
-
-        table.setRowHeight(90);
-        table.setShowGrid(false);
-        table.setIntercellSpacing(new Dimension(0, 10));
-
-        table.setBackground(TABLE_BG);
-        table.setForeground(TEXT);
-
-        table.setSelectionBackground(ACCENT);
-        table.setSelectionForeground(Color.WHITE);
-
-        table.setFont(UI_FONT);
-
-        table.getTableHeader().setFont(
-                new Font("Segoe UI", Font.BOLD, 14)
-        );
-
-        table.getTableHeader().setBackground(PANEL);
-        table.getTableHeader().setForeground(TEXT);
-
-        JScrollPane scrollPane = new JScrollPane(table);
-
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        scrollPane.getViewport().setBackground(TABLE_BG);
-
-        refreshTable(manager.getGames().values());
-
-        // =========================
+        // ========================================
         // SIDEBAR FORM
-        // =========================
+        // ========================================
 
         JPanel sidebar = new JPanel(new GridBagLayout());
 
-        sidebar.setPreferredSize(new Dimension(360, 0));
+        sidebar.setPreferredSize(new Dimension(350, 0));
 
         sidebar.setBackground(PANEL);
 
-        sidebar.setBorder(
-                BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(60, 60, 60)),
-                        new EmptyBorder(20, 20, 20, 20)
-                )
-        );
+        sidebar.setBorder(new EmptyBorder(20, 20, 20, 20));
 
         GridBagConstraints gbc = new GridBagConstraints();
 
         gbc.insets = new Insets(8, 8, 8, 8);
         gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.weightx = 1;
 
         // TITLE
 
-        gbc.gridx = 0;
         gbc.gridy = 0;
-
-        JLabel lblTitle = createLabel("Title");
-        sidebar.add(lblTitle, gbc);
+        sidebar.add(createLabel("Title"), gbc);
 
         gbc.gridy++;
-
         txtTitle = createTextField();
         sidebar.add(txtTitle, gbc);
 
         // GENRE
 
         gbc.gridy++;
-
         sidebar.add(createLabel("Genre"), gbc);
 
         gbc.gridy++;
-
         txtGenre = createTextField();
         sidebar.add(txtGenre, gbc);
 
         // EXTRA
 
         gbc.gridy++;
-
         sidebar.add(createLabel("Extra Detail"), gbc);
 
         gbc.gridy++;
-
         txtExtra = createTextField();
         sidebar.add(txtExtra, gbc);
 
         // STATUS
 
         gbc.gridy++;
-
         sidebar.add(createLabel("Status"), gbc);
 
         gbc.gridy++;
 
-        comboTracker = new JComboBox<>(
-                new String[]{
-                        "Still Playing",
-                        "Finished",
-                        "Dropped"
-                }
-        );
+        comboTracker = new JComboBox<>(new String[]{
+                "Still Playing",
+                "Finished",
+                "Dropped"
+        });
 
         comboTracker.setFont(UI_FONT);
 
@@ -274,7 +214,6 @@ public class GameVaultUI extends JFrame {
         comboChapter.setFont(UI_FONT);
 
         gbc.gridy++;
-
         sidebar.add(comboChapter, gbc);
 
         // LEVELS
@@ -290,7 +229,6 @@ public class GameVaultUI extends JFrame {
         comboLevel.setFont(UI_FONT);
 
         gbc.gridy++;
-
         sidebar.add(comboLevel, gbc);
 
         comboChapter.setEnabled(false);
@@ -304,7 +242,7 @@ public class GameVaultUI extends JFrame {
             comboLevel.setEnabled(selected);
         });
 
-        // IMAGE
+        // IMAGE BUTTON
 
         gbc.gridy++;
 
@@ -323,9 +261,7 @@ public class GameVaultUI extends JFrame {
 
         sidebar.add(lblImageName, gbc);
 
-        // =========================
         // ACTION BUTTONS
-        // =========================
 
         gbc.gridy++;
 
@@ -372,95 +308,54 @@ public class GameVaultUI extends JFrame {
 
         sidebar.add(btnSaveAs, gbc);
 
-        // =========================
-        // SPLIT PANE
-        // =========================
+        add(sidebar, BorderLayout.WEST);
 
-        JSplitPane splitPane = new JSplitPane(
-                JSplitPane.HORIZONTAL_SPLIT,
-                sidebar,
-                scrollPane
-        );
+        // ========================================
+        // BUTTON ACTIONS
+        // ========================================
 
-        splitPane.setDividerLocation(360);
-
-        splitPane.setBorder(null);
-
-        add(splitPane, BorderLayout.CENTER);
-
-        // =========================
-        // TABLE CLICK
-        // =========================
-
-        table.addMouseListener(new MouseAdapter() {
-
-            @Override
-            public void mouseClicked(MouseEvent e) {
-
-                int row = table.getSelectedRow();
-
-                if (row >= 0) {
-
-                    txtTitle.setText(
-                            tableModel.getValueAt(row, 1).toString()
-                    );
-
-                    txtGenre.setText(
-                            tableModel.getValueAt(row, 2).toString()
-                    );
-
-                    txtExtra.setText(
-                            tableModel.getValueAt(row, 3).toString()
-                    );
-
-                    comboTracker.setSelectedItem(
-                            tableModel.getValueAt(row, 4).toString()
-                    );
-
-                    String storyInfo =
-                            tableModel.getValueAt(row, 5).toString();
-
-                    if (!storyInfo.equals("N/A")) {
-
-                        chkStory.setSelected(true);
-
-                        comboChapter.setEnabled(true);
-                        comboLevel.setEnabled(true);
-
-                    } else {
-
-                        chkStory.setSelected(false);
-
-                        comboChapter.setEnabled(false);
-                        comboLevel.setEnabled(false);
-                    }
-                }
-            }
-        });
-
-        // =========================
-        // IMAGE BUTTON
-        // =========================
+        // Create covers folder automatically
+        new File(COVER_FOLDER).mkdirs();
 
         btnImage.addActionListener(e -> {
 
             JFileChooser fc = new JFileChooser();
 
-            if (fc.showOpenDialog(this)
-                    == JFileChooser.APPROVE_OPTION) {
+            if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
 
-                currentImagePath =
-                        fc.getSelectedFile().getAbsolutePath();
+                try {
 
-                lblImageName.setText(
-                        fc.getSelectedFile().getName()
-                );
+                    File selected = fc.getSelectedFile();
+
+                    String fileName =
+                            System.currentTimeMillis()
+                                    + "_"
+                                    + selected.getName();
+
+                    Path destination = Path.of(
+                            COVER_FOLDER,
+                            fileName
+                    );
+
+                    Files.copy(
+                            selected.toPath(),
+                            destination,
+                            StandardCopyOption.REPLACE_EXISTING
+                    );
+
+                    currentImagePath = destination.toString();
+
+                    lblImageName.setText(selected.getName());
+
+                } catch (Exception ex) {
+
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "Failed to copy image!"
+                    );
+                }
             }
         });
-
-        // =========================
-        // INSERT
-        // =========================
 
         btnAdd.addActionListener(e -> {
 
@@ -502,10 +397,6 @@ public class GameVaultUI extends JFrame {
             }
         });
 
-        // =========================
-        // UPDATE
-        // =========================
-
         btnUpdate.addActionListener(e -> {
 
             if (manager.update(
@@ -523,16 +414,9 @@ public class GameVaultUI extends JFrame {
 
             } else {
 
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Game not found!"
-                );
+                JOptionPane.showMessageDialog(this, "Game not found!");
             }
         });
-
-        // =========================
-        // DELETE
-        // =========================
 
         btnDelete.addActionListener(e -> {
 
@@ -542,31 +426,22 @@ public class GameVaultUI extends JFrame {
 
             } else {
 
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Game not found!"
-                );
+                JOptionPane.showMessageDialog(this, "Game not found!");
             }
         });
-
-        // =========================
-        // OPEN CSV
-        // =========================
 
         btnOpen.addActionListener(e -> {
 
             JFileChooser fc = new JFileChooser();
 
             fc.setFileFilter(
-                    new javax.swing.filechooser
-                            .FileNameExtensionFilter(
+                    new javax.swing.filechooser.FileNameExtensionFilter(
                             "CSV Files",
                             "csv"
                     )
             );
 
-            if (fc.showOpenDialog(this)
-                    == JFileChooser.APPROVE_OPTION) {
+            if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
 
                 manager.setFileName(
                         fc.getSelectedFile().getAbsolutePath()
@@ -576,27 +451,20 @@ public class GameVaultUI extends JFrame {
             }
         });
 
-        // =========================
-        // SAVE AS
-        // =========================
-
         btnSaveAs.addActionListener(e -> {
 
             JFileChooser fc = new JFileChooser();
 
             fc.setFileFilter(
-                    new javax.swing.filechooser
-                            .FileNameExtensionFilter(
+                    new javax.swing.filechooser.FileNameExtensionFilter(
                             "CSV Files",
                             "csv"
                     )
             );
 
-            if (fc.showSaveDialog(this)
-                    == JFileChooser.APPROVE_OPTION) {
+            if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
 
-                String path =
-                        fc.getSelectedFile().getAbsolutePath();
+                String path = fc.getSelectedFile().getAbsolutePath();
 
                 if (!path.endsWith(".csv")) {
                     path += ".csv";
@@ -612,174 +480,324 @@ public class GameVaultUI extends JFrame {
         });
     }
 
-    // =========================
-    // MODERN COMPONENTS
-    // =========================
+    // ========================================
+    // GAME GRID
+    // ========================================
 
-    private JTextField createTextField() {
+    private void setupGameGrid() {
 
-        JTextField field = new JTextField();
+        gameGrid = new JPanel();
 
-        field.setFont(UI_FONT);
+        gameGrid.setLayout(new WrapLayout(FlowLayout.LEFT, 20, 20));
 
-        field.setPreferredSize(
-                new Dimension(200, 40)
-        );
+        gameGrid.setBackground(BACKGROUND);
 
-        return field;
+        refreshGameGrid(manager.getGames().values());
+
+        JScrollPane scroll = new JScrollPane(gameGrid);
+
+        scroll.setBorder(null);
+
+        scroll.getViewport().setBackground(BACKGROUND);
+
+        add(scroll, BorderLayout.CENTER);
     }
 
-    private JLabel createLabel(String text) {
+    private JPanel createGameCard(Game g) {
 
-        JLabel lbl = new JLabel(text);
+        JPanel card = new JPanel(new BorderLayout());
 
-        lbl.setFont(
-                new Font("Segoe UI", Font.BOLD, 14)
+        card.setPreferredSize(new Dimension(180, 280));
+
+        card.setBackground(new Color(35, 37, 43));
+
+        card.setBorder(
+                BorderFactory.createLineBorder(
+                        new Color(50, 50, 50)
+                )
         );
 
-        lbl.setForeground(TEXT);
+        // =========================
+        // TOP BAR
+        // =========================
 
-        return lbl;
-    }
+        JPanel topBar = new JPanel(new BorderLayout());
 
-    private JButton createModernButton(
-            String text,
-            Color color
-    ) {
+        topBar.setOpaque(false);
 
-        JButton btn = new JButton(text);
+        JButton menuBtn = new JButton("⋮");
 
-        btn.setFocusPainted(false);
+        menuBtn.setFocusPainted(false);
 
-        btn.setBorderPainted(false);
+        menuBtn.setBorderPainted(false);
 
-        btn.setForeground(Color.WHITE);
+        menuBtn.setContentAreaFilled(false);
 
-        btn.setBackground(color);
+        menuBtn.setForeground(Color.WHITE);
 
-        btn.setFont(
-                new Font("Segoe UI", Font.BOLD, 14)
-        );
-
-        btn.setCursor(
+        menuBtn.setCursor(
                 new Cursor(Cursor.HAND_CURSOR)
         );
 
-        btn.setPreferredSize(
-                new Dimension(120, 42)
+        JPopupMenu menu = new JPopupMenu();
+
+        JMenuItem editItem = new JMenuItem("Edit");
+
+        JMenuItem deleteItem = new JMenuItem("Delete");
+
+        menu.add(editItem);
+        menu.add(deleteItem);
+
+        menuBtn.addActionListener(e ->
+                menu.show(menuBtn, 0, menuBtn.getHeight())
         );
 
-        btn.addMouseListener(new MouseAdapter() {
+        topBar.add(menuBtn, BorderLayout.EAST);
+
+        // =========================
+        // IMAGE
+        // =========================
+
+        JLabel imgLabel = new JLabel();
+
+        imgLabel.setHorizontalAlignment(JLabel.CENTER);
+
+        if (!g.getImagePath().equals("none")
+                &&
+                new File(g.getImagePath()).exists()) {
+
+            ImageIcon icon = new ImageIcon(g.getImagePath());
+
+            Image scaled =
+                    icon.getImage().getScaledInstance(
+                            180,
+                            240,
+                            Image.SCALE_SMOOTH
+                    );
+
+            imgLabel.setIcon(new ImageIcon(scaled));
+
+        } else {
+
+            imgLabel.setText("No Image");
+
+            imgLabel.setForeground(Color.WHITE);
+        }
+
+        // =========================
+        // TITLE
+        // =========================
+
+        JLabel title = new JLabel(
+                g.getTitle(),
+                JLabel.CENTER
+        );
+
+        title.setForeground(Color.WHITE);
+
+        title.setFont(
+                new Font("Segoe UI", Font.BOLD, 14)
+        );
+
+        title.setBorder(
+                new EmptyBorder(10, 5, 10, 5)
+        );
+
+        // =========================
+        // CARD LAYOUT
+        // =========================
+
+        card.add(topBar, BorderLayout.NORTH);
+
+        card.add(imgLabel, BorderLayout.CENTER);
+
+        card.add(title, BorderLayout.SOUTH);
+
+        // =========================
+        // CLICK CARD → DETAILS
+        // =========================
+
+        card.addMouseListener(new MouseAdapter() {
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+
+                showGameDetails(g);
+            }
 
             @Override
             public void mouseEntered(MouseEvent e) {
-                btn.setBackground(color.brighter());
+                card.setBackground(new Color(50, 53, 61));
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                btn.setBackground(color);
+                card.setBackground(new Color(35, 37, 43));
             }
         });
 
-        return btn;
-    }
+    // ----------------------
+   //EDIT FUNCTION ----------------------
+  // ----------------------
 
-    // =========================
-    // FILTER TABLE
-    // =========================
+        editItem.addActionListener(e -> {
 
-    private void filterTable() {
+            txtTitle.setText(g.getTitle());
 
-        String query =
-                txtSearch.getText().toLowerCase();
+            txtGenre.setText(g.getGenre());
 
-        List<Game> filtered =
-                manager.getGames()
-                        .values()
-                        .stream()
-                        .filter(g ->
-                                g.getTitle()
-                                        .toLowerCase()
-                                        .contains(query)
+            txtExtra.setText(g.getExtraDetail());
 
-                                        ||
+            comboTracker.setSelectedItem(
+                    g.getTracker()
+            );
 
-                                        g.getTracker()
-                                                .toLowerCase()
-                                                .contains(query)
-                        )
-                        .collect(Collectors.toList());
-
-        refreshTable(filtered);
-    }
-
-    // =========================
-    // REFRESH TABLE
-    // =========================
-
-    private void refreshTable(
-            Iterable<Game> gamesToDisplay
-    ) {
-
-        tableModel.setRowCount(0);
-
-        for (Game g : gamesToDisplay) {
-
-            ImageIcon icon = null;
-
-            if (!g.getImagePath().equals("none")
-                    &&
-                    new File(g.getImagePath()).exists()) {
-
-                Image img =
-                        new ImageIcon(
-                                g.getImagePath()
-                        ).getImage();
-
-                Image scaled =
-                        img.getScaledInstance(
-                                60,
-                                80,
-                                Image.SCALE_SMOOTH
-                        );
-
-                icon = new ImageIcon(scaled);
-            }
-
-            String storyDisplay = "N/A";
+            currentImagePath = g.getImagePath();
 
             if (g instanceof StoryGame) {
 
                 StoryGame sg = (StoryGame) g;
 
-                storyDisplay =
-                        "Ch: "
-                                + sg.getChapter()
-                                + " | Lvl: "
-                                + sg.getLevel();
-            }
+                chkStory.setSelected(true);
 
-            tableModel.addRow(
-                    new Object[]{
-                            icon,
-                            g.getTitle(),
-                            g.getGenre(),
-                            g.getExtraDetail(),
-                            g.getTracker(),
-                            storyDisplay
-                    }
-            );
-        }
+                comboChapter.setEnabled(true);
+
+                comboLevel.setEnabled(true);
+
+                comboChapter.setSelectedItem(
+                        sg.getChapter()
+                );
+
+                comboLevel.setSelectedItem(
+                        sg.getLevel()
+                );
+            }
+        });
+
+    // ----------------------
+   //DELETE ----------------------
+  // ----------------------
+
+        deleteItem.addActionListener(e -> {
+
+            int confirm =
+                    JOptionPane.showConfirmDialog(
+                            this,
+                            "Delete " + g.getTitle() + "?",
+                            "Confirm Delete",
+                            JOptionPane.YES_NO_OPTION
+                    );
+
+            if (confirm == JOptionPane.YES_OPTION) {
+
+                manager.delete(g.getTitle());
+
+                refreshGameGrid(
+                        manager.getGames().values()
+                );
+            }
+        });
+
+        return card;
     }
 
-    // =========================
-    // RESET UI
-    // =========================
+    private void refreshGameGrid(Iterable<Game> games) {
 
+        gameGrid.removeAll();
+
+        for (Game g : games) {
+            gameGrid.add(createGameCard(g));
+        }
+
+        gameGrid.revalidate();
+        gameGrid.repaint();
+    }
+
+    // ----------------------
+   //GAME DETAIL POP-UP ----------------------
+  // ----------------------
+
+    private void showGameDetails(Game g) {
+
+        JDialog dialog = new JDialog(this, "Game Details", true);
+
+        dialog.setSize(450, 700);
+
+        dialog.setLocationRelativeTo(this);
+
+        dialog.setLayout(new BorderLayout());
+
+        JPanel panel = new JPanel();
+
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+
+        panel.setBackground(new Color(30, 32, 38));
+
+        panel.setBorder(new EmptyBorder(20, 20, 20, 20));
+
+        JLabel img = new JLabel();
+
+        img.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        if (!g.getImagePath().equals("none") &&
+                new File(g.getImagePath()).exists()) {
+
+            ImageIcon icon = new ImageIcon(g.getImagePath());
+
+            Image scaled = icon.getImage().getScaledInstance(
+                    280,
+                    380,
+                    Image.SCALE_SMOOTH
+            );
+
+            img.setIcon(new ImageIcon(scaled));
+        }
+
+        panel.add(img);
+
+        panel.add(Box.createVerticalStrut(20));
+
+        panel.add(createInfo("Title: " + g.getTitle()));
+        panel.add(createInfo("Genre: " + g.getGenre()));
+        panel.add(createInfo("Status: " + g.getTracker()));
+        panel.add(createInfo("Extra: " + g.getExtraDetail()));
+
+        if (g instanceof StoryGame) {
+
+            StoryGame sg = (StoryGame) g;
+
+            panel.add(createInfo("Chapter: " + sg.getChapter()));
+            panel.add(createInfo("Level: " + sg.getLevel()));
+        }
+
+        dialog.add(panel, BorderLayout.CENTER);
+
+        dialog.setVisible(true);
+    }
+
+    // ----------------------
+   //SEARCH FILTER FUNCTION ----------------------
+  // ----------------------
+    private void filterGames() {
+
+        String query = txtSearch.getText().toLowerCase();
+
+        List<Game> filtered = manager.getGames()
+                .values()
+                .stream()
+                .filter(g ->
+                        g.getTitle().toLowerCase().contains(query)
+                                ||
+                                g.getTracker().toLowerCase().contains(query)
+                )
+                .collect(Collectors.toList());
+
+        refreshGameGrid(filtered);
+    }
+    // ----------------------
+   //RESET UI FUNCTION ----------------------
+  // ----------------------
     private void resetUI() {
-
-        txtSearch.setText("");
 
         txtTitle.setText("");
         txtGenre.setText("");
@@ -796,16 +814,88 @@ public class GameVaultUI extends JFrame {
 
         lblImageName.setText("No file chosen");
 
-        refreshTable(manager.getGames().values());
+        refreshGameGrid(manager.getGames().values());
     }
 
-    // =========================
-    // MAIN
-    // =========================
+    // ========================================
+    // MODERN COMPONENTS
+    // ========================================
+
+    private JTextField createTextField() {
+
+        JTextField field = new JTextField();
+
+        field.setFont(UI_FONT);
+
+        field.setPreferredSize(new Dimension(200, 40));
+
+        return field;
+    }
+
+    private JLabel createLabel(String text) {
+
+        JLabel lbl = new JLabel(text);
+
+        lbl.setForeground(TEXT);
+
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
+
+        return lbl;
+    }
+
+    private JLabel createInfo(String text) {
+
+        JLabel lbl = new JLabel(text);
+
+        lbl.setForeground(Color.WHITE);
+
+        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+
+        lbl.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        return lbl;
+    }
+
+    private JButton createModernButton(String text, Color color) {
+
+        JButton btn = new JButton(text);
+
+        btn.setFocusPainted(false);
+
+        btn.setBorderPainted(false);
+
+        btn.setForeground(Color.WHITE);
+
+        btn.setBackground(color);
+
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        btn.setPreferredSize(new Dimension(120, 42));
+
+        btn.addMouseListener(new MouseAdapter() {
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                btn.setBackground(color.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                btn.setBackground(color);
+            }
+        });
+
+        return btn;
+    }
+    // ----------------------
+   // MAIN ----------------------
+  // ----------------------
 
     public static void main(String[] args) {
 
-        FlatMacDarkLaf.setup();
+        FlatDarkLaf.setup();
 
         SwingUtilities.invokeLater(() -> {
 
