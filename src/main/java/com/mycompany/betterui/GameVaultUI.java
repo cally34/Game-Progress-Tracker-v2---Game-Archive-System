@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.awt.GridLayout;
 
 public class GameVaultUI extends JFrame {
 
@@ -486,15 +487,19 @@ public class GameVaultUI extends JFrame {
 
     private void setupGameGrid() {
 
-        gameGrid = new JPanel();
+        gameGrid = new JPanel(new GridLayout(0, 3, 20, 20));
+        
+        gameGrid.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        gameGrid.setLayout(new WrapLayout(FlowLayout.LEFT, 20, 20));
+        gameGrid.setLayout(new GridLayout(0, 3, 20, 20));
 
         gameGrid.setBackground(BACKGROUND);
 
         refreshGameGrid(manager.getGames().values());
 
         JScrollPane scroll = new JScrollPane(gameGrid);
+        
+        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
         scroll.setBorder(null);
 
